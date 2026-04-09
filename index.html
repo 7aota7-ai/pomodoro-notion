@@ -513,6 +513,7 @@ let todayAdded = 0;
   applyConfig();
   renderDots();
   checkBanner();
+  renderLog(); // ← ログを復元
 })();
 
 function checkBanner() {
@@ -668,9 +669,26 @@ function populateSelect() {
     opt.value = t.id; opt.textContent = t.name;
     sel.appendChild(opt);
   });
+
+  // 前回選択していたタスクを復元
+  const savedId = localStorage.getItem('pomo-selected-task');
+  if (savedId) {
+    const match = tasks.find(t => t.id === savedId);
+    if (match) {
+      sel.value = savedId;
+      selectedTask = match;
+      updateStatDisplay();
+    }
+  }
+
   sel.onchange = () => {
     selectedTask = tasks.find(t => t.id === sel.value) || null;
     todayAdded = 0;
+    if (selectedTask) {
+      localStorage.setItem('pomo-selected-task', selectedTask.id);
+    } else {
+      localStorage.removeItem('pomo-selected-task');
+    }
     updateStatDisplay();
   };
 }
@@ -703,20 +721,41 @@ async function saveToNotion(task, addedMin) {
 }
 
 // ── LOG ───────────────────────────────────────────────
-function addLog(taskName, min, saved) {
+const LOG_KEY = 'pomo-log-v1';
+const MAX_LOG = 30; // 最大保持件数
+
+function loadLog() {
+  try { return JSON.parse(localStorage.getItem(LOG_KEY)) || []; } catch(e) { return []; }
+}
+function saveLog(entries) {
+  localStorage.setItem(LOG_KEY, JSON.stringify(entries.slice(0, MAX_LOG)));
+}
+function renderLog() {
+  const entries = loadLog();
   const list = document.getElementById('log-list');
-  const empty = list.querySelector('.empty-log');
-  if (empty) empty.remove();
+  list.innerHTML = '';
+  if (entries.length === 0) {
+    list.innerHTML = '<li class="empty-log">まだセッションがありません</li>';
+    return;
+  }
+  entries.forEach(e => {
+    const li = document.createElement('li');
+    li.className = 'log-item';
+    li.innerHTML = `
+      <span class="log-task">${e.taskName}</span>
+      <span class="log-right">
+        <span class="log-meta">${e.min}分 · ${e.time}</span>
+        ${e.saved ? '<span class="log-saved">✓ 保存</span>' : ''}
+      </span>`;
+    list.appendChild(li);
+  });
+}
+function addLog(taskName, min, saved) {
   const time = new Date().toLocaleTimeString('ja-JP', { hour:'2-digit', minute:'2-digit' });
-  const li = document.createElement('li');
-  li.className = 'log-item';
-  li.innerHTML = `
-    <span class="log-task">${taskName}</span>
-    <span class="log-right">
-      <span class="log-meta">${min}分 · ${time}</span>
-      ${saved ? '<span class="log-saved">✓ 保存</span>' : ''}
-    </span>`;
-  list.prepend(li);
+  const entries = loadLog();
+  entries.unshift({ taskName, min, saved, time });
+  saveLog(entries);
+  renderLog();
 }
 
 // ── TOAST ─────────────────────────────────────────────

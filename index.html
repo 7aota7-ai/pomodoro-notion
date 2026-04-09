@@ -513,7 +513,27 @@ let todayAdded = 0;
   applyConfig();
   renderDots();
   checkBanner();
-  renderLog(); // ← ログを復元
+  renderLog();
+
+  // タイマーが動いていた場合は復元
+  const timerState = localStorage.getItem(TIMER_STATE_KEY);
+  if (timerState) {
+    try {
+      const state = JSON.parse(timerState);
+      const elapsed = Math.floor((Date.now() - state.startedAt) / 1000);
+      const remainingAtResume = state.remainingAtStart - elapsed;
+      if (remainingAtResume > 0 && state.mode === mode) {
+        remaining = remainingAtResume;
+        updateDisplay();
+        updateProgress();
+        startTimer();
+      } else {
+        localStorage.removeItem(TIMER_STATE_KEY);
+      }
+    } catch(e) {
+      localStorage.removeItem(TIMER_STATE_KEY);
+    }
+  }
 })();
 
 function checkBanner() {
@@ -569,31 +589,67 @@ function switchMode(m) {
 }
 
 // ── TIMER ─────────────────────────────────────────────
+// 開始時刻ベースの計算方式（タブ非アクティブでも正確）
+const TIMER_STATE_KEY = 'pomo-timer-state';
+
 function toggleTimer() { running ? pauseTimer() : startTimer(); }
+
 function startTimer() {
   running = true;
   document.getElementById('start-btn').textContent = '一時停止';
-  interval = setInterval(tick, 1000);
+
+  // 開始時刻と残り時間をlocalStorageに保存
+  const state = {
+    startedAt: Date.now(),
+    remainingAtStart: remaining,
+    mode: mode,
+  };
+  localStorage.setItem(TIMER_STATE_KEY, JSON.stringify(state));
+
+  interval = setInterval(tick, 500); // 500msで描画更新（精度向上）
 }
+
 function pauseTimer() {
   running = false;
   document.getElementById('start-btn').textContent = '開始';
   clearInterval(interval);
+  localStorage.removeItem(TIMER_STATE_KEY);
 }
-function resetTimer() { pauseTimer(); applyConfig(); }
+
+function resetTimer() {
+  pauseTimer();
+  applyConfig();
+}
+
 function tick() {
-  if (remaining <= 0) { onSessionEnd(); return; }
-  remaining--;
-  updateDisplay(); updateProgress();
+  const state = JSON.parse(localStorage.getItem(TIMER_STATE_KEY));
+  if (!state) return;
+
+  const elapsed = Math.floor((Date.now() - state.startedAt) / 1000);
+  remaining = Math.max(state.remainingAtStart - elapsed, 0);
+
+  updateDisplay();
+  updateProgress();
+
+  if (remaining <= 0) { onSessionEnd(); }
 }
+
 function updateDisplay() {
   const m = Math.floor(remaining/60).toString().padStart(2,'0');
   const s = (remaining%60).toString().padStart(2,'0');
   document.getElementById('timer-display').textContent = `${m}:${s}`;
 }
+
 function updateProgress() {
   document.getElementById('progress-bar').style.width = (remaining/totalSeconds*100)+'%';
 }
+
+// ページ復帰時にタイマー状態を復元
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && running) {
+    tick(); // 即座に現在時刻で再計算
+  }
+});
 
 async function onSessionEnd() {
   pauseTimer();

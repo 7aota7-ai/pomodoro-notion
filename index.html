@@ -704,12 +704,18 @@ async function fetchTasks() {
     });
     if (!res.ok) throw new Error('API error: ' + res.status);
     const data = await res.json();
-    tasks = data.results.map(page => {
-      const tp = page.properties[config.nameProp];
-      const np = page.properties[config.timeProp];
-      const name = tp?.title?.[0]?.plain_text || tp?.rich_text?.[0]?.plain_text || '(無題)';
-      return { id: page.id, name, currentTime: np?.number || 0 };
-    });
+    tasks = data.results
+      .filter(page => {
+        const statusProp = page.properties?.Status;
+        const statusName = statusProp?.status?.name || statusProp?.select?.name || '';
+        return statusName !== 'アーカイブ';
+      })
+      .map(page => {
+        const tp = page.properties[config.nameProp];
+        const np = page.properties[config.timeProp];
+        const name = tp?.title?.[0]?.plain_text || tp?.rich_text?.[0]?.plain_text || '(無題)';
+        return { id: page.id, name, currentTime: np?.number || 0 };
+      });
     populateSelect();
     toast(`${tasks.length}件取得しました`);
   } catch(e) {

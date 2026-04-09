@@ -506,6 +506,7 @@ let pomoCount = 0;
 let tasks = [];
 let selectedTask = null;
 let todayAdded = 0;
+const TIMER_STATE_KEY = 'pomo-timer-state';
 
 (function init() {
   const saved = localStorage.getItem('pomo-config-v2');
@@ -590,11 +591,11 @@ function switchMode(m) {
 
 // ── TIMER ─────────────────────────────────────────────
 // 開始時刻ベースの計算方式（タブ非アクティブでも正確）
-const TIMER_STATE_KEY = 'pomo-timer-state';
 
 function toggleTimer() { running ? pauseTimer() : startTimer(); }
 
 function startTimer() {
+  clearInterval(interval); // 二重起動を防ぐ
   running = true;
   document.getElementById('start-btn').textContent = '一時停止';
 

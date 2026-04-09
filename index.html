@@ -62,6 +62,19 @@
     letter-spacing: -0.357px;
   }
   .settings-btn:hover { color: var(--link-blue); }
+  .mute-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 6px;
+    line-height: 1;
+    transition: color 0.2s;
+  }
+  .mute-btn:hover { color: var(--text); }
+  .mute-btn.muted { color: var(--text-muted); }
 
   .layout {
     display: grid;
@@ -377,7 +390,10 @@
 
 <div class="topbar">
   <div class="app-title">🍅 Pomodoro × Notion</div>
-  <button class="settings-btn" onclick="openSettings()">設定</button>
+  <div style="display:flex;gap:12px;align-items:center;">
+    <button class="mute-btn" id="mute-btn" onclick="toggleMute()" title="サウンドのオン/オフ">🔔</button>
+    <button class="settings-btn" onclick="openSettings()">設定</button>
+  </div>
 </div>
 
 <div class="layout">
@@ -591,11 +607,13 @@ async function onSessionEnd() {
       ? await saveToNotion(selectedTask, addedMin)
       : false;
     addLog(selectedTask ? selectedTask.name : '（タスク未選択）', addedMin, saved);
+    playWorkDone();
     if (Notification.permission === 'granted')
       new Notification('🍅 ポモドーロ完了！', { body: '休憩を取りましょう。' });
     toast('セッション完了！');
     setTimeout(() => switchMode(pomoCount % 4 === 0 ? 'long' : 'break'), 800);
   } else {
+    playBreakDone();
     toast('休憩終了！作業を再開しましょう。');
     setTimeout(() => switchMode('work'), 800);
   }
@@ -710,6 +728,77 @@ function toast(msg, isError = false) {
 }
 
 if (Notification.permission === 'default') Notification.requestPermission();
+
+// ── SOUND ─────────────────────────────────────────────
+let audioCtx = null;
+let muted = false;
+
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+// 落ち着いたベル音: 倍音を重ねてリバーブ感を出す
+function playBell(notes, volume = 0.4) {
+  if (muted) return;
+  const ctx = getAudioCtx();
+  const masterGain = ctx.createGain();
+  masterGain.gain.setValueAtTime(volume, ctx.currentTime);
+  masterGain.connect(ctx.destination);
+
+  notes.forEach(({ freq, time, dur }) => {
+    // 基音
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, ctx.currentTime + time);
+    gain.gain.setValueAtTime(0, ctx.currentTime + time);
+    gain.gain.linearRampToValueAtTime(1, ctx.currentTime + time + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + time + dur);
+    osc.connect(gain);
+    gain.connect(masterGain);
+    osc.start(ctx.currentTime + time);
+    osc.stop(ctx.currentTime + time + dur);
+
+    // 倍音（2倍）で金属感を追加
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(freq * 2.756, ctx.currentTime + time);
+    gain2.gain.setValueAtTime(0, ctx.currentTime + time);
+    gain2.gain.linearRampToValueAtTime(0.25, ctx.currentTime + time + 0.01);
+    gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + time + dur * 0.6);
+    osc2.connect(gain2);
+    gain2.connect(masterGain);
+    osc2.start(ctx.currentTime + time);
+    osc2.stop(ctx.currentTime + time + dur);
+  });
+}
+
+// 作業終了: 穏やかな3音チャイム（高め・明るめ）
+function playWorkDone() {
+  playBell([
+    { freq: 523.25, time: 0,    dur: 1.8 }, // C5
+    { freq: 659.25, time: 0.22, dur: 1.6 }, // E5
+    { freq: 783.99, time: 0.44, dur: 2.2 }, // G5
+  ], 0.35);
+}
+
+// 休憩終了: 低めの2音ゴング（作業再開を促す）
+function playBreakDone() {
+  playBell([
+    { freq: 329.63, time: 0,   dur: 2.4 }, // E4
+    { freq: 261.63, time: 0.3, dur: 3.0 }, // C4
+  ], 0.38);
+}
+
+function toggleMute() {
+  muted = !muted;
+  const btn = document.getElementById('mute-btn');
+  btn.textContent = muted ? '🔕' : '🔔';
+  btn.classList.toggle('muted', muted);
+}
+
 </script>
 </body>
 </html>

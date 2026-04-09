@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pomodoro × Notion</title>
+<style>
+  :root {
+    --bg: #f5f5f7;
+    --surface: #ffffff;
+    --surface2: #f5f5f7;
+    --border: rgba(0,0,0,0.1);
+    --text: #1d1d1f;
+    --text-secondary: rgba(0,0,0,0.56);
+    --text-muted: rgba(0,0,0,0.38);
+    --apple-blue: #0071e3;
+    --link-blue: #0066cc;
+    --break-color: #0071e3;
+    --success: #28a745;
+    --radius-pill: 980px;
+    --radius-card: 18px;
+    --shadow-card: 0 2px 20px rgba(0,0,0,0.08);
+    --font-display: "SF Pro JP", "SF Pro Display", "SF Pro Icons", "Hiragino Kaku Gothic Pro", "ヒラギノ角ゴ Pro W3", メイリオ, Meiryo, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --font-text: "SF Pro JP", "SF Pro Text", "SF Pro Icons", "Hiragino Kaku Gothic Pro", "ヒラギノ角ゴ Pro W3", メイリオ, Meiryo, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-text);
+    font-size: 17px;
+    line-height: 1.47;
+    letter-spacing: -0.357px;
+    min-height: 100vh;
+    padding: 20px;
+  }
+
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding: 0 4px;
+  }
+  .app-title {
+    font-family: var(--font-display);
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.357px;
+  }
+  .settings-btn {
+    background: none;
+    border: none;
+    color: var(--apple-blue);
+    font-family: var(--font-text);
+    font-size: 17px;
+    cursor: pointer;
+    padding: 4px 0;
+    letter-spacing: -0.357px;
+  }
+  .settings-btn:hover { color: var(--link-blue); }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+
+  .card {
+    background: var(--surface);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+    padding: 28px 24px;
+  }
+
+  .mode-tabs {
+    display: flex;
+    background: var(--surface2);
+    border-radius: var(--radius-pill);
+    padding: 3px;
+    margin-bottom: 28px;
+    gap: 2px;
+  }
+  .mode-tab {
+    flex: 1;
+    padding: 5px 8px;
+    font-family: var(--font-text);
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-secondary);
+    background: none;
+    border: none;
+    border-radius: var(--radius-pill);
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    letter-spacing: -0.2px;
+  }
+  .mode-tab.active {
+    background: var(--surface);
+    color: var(--text);
+    font-weight: 600;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+  }
+
+  .timer-label {
+    font-family: var(--font-text);
+    font-size: 14px;
+    color: var(--text-muted);
+    text-align: center;
+    margin-bottom: 6px;
+    letter-spacing: normal;
+  }
+  .timer-display {
+    font-family: var(--font-display);
+    font-size: 72px;
+    font-weight: 600;
+    line-height: 1.05;
+    letter-spacing: -2px;
+    text-align: center;
+    color: var(--text);
+    transition: color 0.4s;
+    margin-bottom: 16px;
+  }
+  .timer-display.break-mode { color: var(--apple-blue); }
+
+  .progress-bar-wrap {
+    height: 3px;
+    background: rgba(0,0,0,0.08);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+  .progress-bar {
+    height: 100%;
+    background: var(--text);
+    border-radius: 2px;
+    transition: width 0.5s linear, background 0.4s;
+    width: 100%;
+  }
+  .progress-bar.break-mode { background: var(--apple-blue); }
+
+  .pomo-dots {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    margin-bottom: 24px;
+  }
+  .pomo-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.1);
+    transition: all 0.3s;
+  }
+  .pomo-dot.done { background: var(--text); }
+
+  .controls {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+  }
+
+  .btn {
+    padding: 8px 22px;
+    border-radius: var(--radius-pill);
+    font-family: var(--font-text);
+    font-size: 17px;
+    font-weight: 400;
+    letter-spacing: -0.357px;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+  }
+  .btn-primary {
+    background: var(--apple-blue);
+    color: #fff;
+    min-width: 100px;
+    text-align: center;
+  }
+  .btn-primary:hover { background: #0077ed; }
+  .btn-outline {
+    background: transparent;
+    color: var(--apple-blue);
+    border: 1px solid var(--apple-blue);
+  }
+  .btn-outline:hover { background: rgba(0,113,227,0.05); }
+  .btn-sm { font-size: 14px; padding: 6px 16px; }
+
+  .right-col {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .section-title {
+    font-family: var(--font-display);
+    font-size: 19px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.24;
+    letter-spacing: 0.196px;
+    margin-bottom: 14px;
+  }
+
+  .task-select {
+    width: 100%;
+    background: var(--surface2);
+    border: none;
+    color: var(--text);
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-family: var(--font-text);
+    font-size: 17px;
+    letter-spacing: -0.357px;
+    appearance: none;
+    cursor: pointer;
+    margin-bottom: 10px;
+    outline: none;
+    transition: background 0.2s;
+  }
+  .task-select:focus { background: #ebebed; }
+  .task-select option { background: #fff; }
+
+  .fetch-btn {
+    background: none;
+    border: none;
+    color: var(--apple-blue);
+    font-family: var(--font-text);
+    font-size: 14px;
+    letter-spacing: normal;
+    cursor: pointer;
+    padding: 4px 0;
+  }
+  .fetch-btn:hover { color: var(--link-blue); }
+
+  .task-stats {
+    display: flex;
+    gap: 20px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+  }
+  .stat-item { font-size: 14px; color: var(--text-secondary); letter-spacing: normal; }
+  .stat-item span { color: var(--text); font-weight: 600; }
+
+  .log-list { list-style: none; display: flex; flex-direction: column; gap: 1px; }
+  .log-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+    letter-spacing: normal;
+  }
+  .log-item:last-child { border-bottom: none; }
+  .log-task { color: var(--text); }
+  .log-right { display: flex; align-items: center; gap: 8px; }
+  .log-meta { color: var(--text-secondary); font-size: 14px; }
+  .log-saved { color: var(--success); font-size: 12px; }
+  .empty-log { color: var(--text-muted); font-size: 14px; text-align: center; padding: 20px 0; letter-spacing: normal; }
+
+  /* ── SETTINGS MODAL ── */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.4);
+    backdrop-filter: blur(8px);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface);
+    border-radius: var(--radius-card);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    padding: 36px 32px;
+    width: 90%;
+    max-width: 400px;
+  }
+  .modal h2 {
+    font-family: var(--font-display);
+    font-size: 21px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 8px;
+    letter-spacing: -0.357px;
+  }
+  .modal-desc {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 24px;
+    letter-spacing: normal;
+    line-height: 1.5;
+  }
+  .form-section-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin: 20px 0 10px;
+  }
+  .form-group { margin-bottom: 12px; }
+  label {
+    display: block;
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 5px;
+    letter-spacing: normal;
+  }
+  input {
+    width: 100%;
+    background: var(--surface2);
+    border: none;
+    color: var(--text);
+    padding: 9px 14px;
+    border-radius: 10px;
+    font-family: var(--font-text);
+    font-size: 17px;
+    letter-spacing: -0.357px;
+    outline: none;
+    transition: background 0.2s;
+  }
+  input:focus { background: #ebebed; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+
+  /* worker URL未設定バナー */
+  .banner {
+    background: #fff8e6;
+    border: 1px solid #f0d070;
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-size: 13px;
+    color: #7a5c00;
+    margin-bottom: 16px;
+    display: none;
+    letter-spacing: normal;
+    line-height: 1.5;
+  }
+  .banner.show { display: block; }
+  .banner a { color: var(--apple-blue); cursor: pointer; text-decoration: none; }
+
+  .toast {
+    position: fixed;
+    bottom: 24px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(29,29,31,0.92);
+    color: #f5f5f7;
+    font-family: var(--font-text);
+    font-size: 14px;
+    letter-spacing: normal;
+    padding: 10px 20px;
+    border-radius: var(--radius-pill);
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    z-index: 200;
+    white-space: nowrap;
+    backdrop-filter: blur(10px);
+  }
+  .toast.show { opacity: 1; }
+  .toast.error { background: rgba(192,57,43,0.92); }
+</style>
+</head>
+<body>
+
+<!-- Worker URL未設定バナー -->
+<div class="banner" id="banner">
+  ⚠️ Cloudflare WorkerのURLが未設定です。<a onclick="openSettings()">設定</a>から入力してください。
+</div>
+
+<div class="topbar">
+  <div class="app-title">🍅 Pomodoro × Notion</div>
+  <button class="settings-btn" onclick="openSettings()">設定</button>
+</div>
+
+<div class="layout">
+
+  <!-- LEFT: TIMER -->
+  <div class="card">
+    <div class="mode-tabs">
+      <button class="mode-tab active" id="tab-work" onclick="switchMode('work')">作業</button>
+      <button class="mode-tab" id="tab-break" onclick="switchMode('break')">休憩</button>
+      <button class="mode-tab" id="tab-long" onclick="switchMode('long')">長休憩</button>
+    </div>
+    <div class="timer-label" id="timer-label">作業セッション</div>
+    <div class="timer-display" id="timer-display">25:00</div>
+    <div class="progress-bar-wrap">
+      <div class="progress-bar" id="progress-bar"></div>
+    </div>
+    <div class="pomo-dots" id="pomo-dots"></div>
+    <div class="controls">
+      <button class="btn btn-outline" onclick="resetTimer()">リセット</button>
+      <button class="btn btn-primary" id="start-btn" onclick="toggleTimer()">開始</button>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="right-col">
+    <div class="card">
+      <div class="section-title">現在のタスク</div>
+      <select class="task-select" id="task-select">
+        <option value="">— タスクを選択 —</option>
+      </select>
+      <button class="fetch-btn" onclick="fetchTasks()">↻ Notionから取得</button>
+      <div class="task-stats" id="task-stats" style="display:none">
+        <div class="stat-item">合計作業時間: <span id="stat-total">0</span> 分</div>
+        <div class="stat-item">本日の追加: <span id="stat-today">0</span> 分</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="section-title">セッションログ</div>
+      <ul class="log-list" id="log-list">
+        <li class="empty-log">まだセッションがありません</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h2>設定</h2>
+    <p class="modal-desc">APIキーはCloudflare Workerの環境変数に保存されます。このページには保持されません。</p>
+
+    <div class="form-section-label">Cloudflare Worker</div>
+    <div class="form-group">
+      <label>Worker URL</label>
+      <input type="text" id="input-worker" placeholder="https://your-worker.workers.dev">
+    </div>
+
+    <div class="form-section-label">Notion データベース</div>
+    <div class="form-group">
+      <label>Database ID</label>
+      <input type="text" id="input-dbid" placeholder="32文字のID">
+    </div>
+    <div class="form-group">
+      <label>タスク名プロパティ名</label>
+      <input type="text" id="input-nameprop" placeholder="Name">
+    </div>
+    <div class="form-group">
+      <label>作業時間プロパティ名</label>
+      <input type="text" id="input-timeprop" placeholder="合計時間（分）">
+    </div>
+
+    <div class="form-section-label">タイマー設定</div>
+    <div class="form-group">
+      <label>作業時間 (分)</label>
+      <input type="number" id="input-work" value="25" min="1" max="60">
+    </div>
+    <div class="form-group">
+      <label>短い休憩 (分)</label>
+      <input type="number" id="input-break" value="5" min="1" max="30">
+    </div>
+    <div class="form-group">
+      <label>長い休憩 (分)</label>
+      <input type="number" id="input-long" value="15" min="1" max="60">
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-sm" onclick="closeSettings()">キャンセル</button>
+      <button class="btn btn-primary btn-sm" onclick="saveSettings()">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────
+let config = {
+  workerUrl: '',   // ← Notionトークンはここには保存しない
+  dbId: '',
+  nameProp: 'Name',
+  timeProp: '合計時間（分）',
+  workMin: 25, breakMin: 5, longMin: 15,
+};
+let mode = 'work';
+let totalSeconds = 25 * 60;
+let remaining = totalSeconds;
+let running = false;
+let interval = null;
+let pomoCount = 0;
+let tasks = [];
+let selectedTask = null;
+let todayAdded = 0;
+
+(function init() {
+  const saved = localStorage.getItem('pomo-config-v2');
+  if (saved) { try { config = { ...config, ...JSON.parse(saved) }; } catch(e) {} }
+  applyConfig();
+  renderDots();
+  checkBanner();
+})();
+
+function checkBanner() {
+  document.getElementById('banner').classList.toggle('show', !config.workerUrl);
+}
+
+// ── SETTINGS ──────────────────────────────────────────
+function openSettings() {
+  document.getElementById('input-worker').value = config.workerUrl;
+  document.getElementById('input-dbid').value = config.dbId;
+  document.getElementById('input-nameprop').value = config.nameProp;
+  document.getElementById('input-timeprop').value = config.timeProp;
+  document.getElementById('input-work').value = config.workMin;
+  document.getElementById('input-break').value = config.breakMin;
+  document.getElementById('input-long').value = config.longMin;
+  document.getElementById('modal').classList.add('open');
+}
+function closeSettings() { document.getElementById('modal').classList.remove('open'); }
+function saveSettings() {
+  config.workerUrl = document.getElementById('input-worker').value.trim().replace(/\/$/, '');
+  config.dbId = document.getElementById('input-dbid').value.trim();
+  config.nameProp = document.getElementById('input-nameprop').value.trim() || 'Name';
+  config.timeProp = document.getElementById('input-timeprop').value.trim() || '合計時間（分）';
+  config.workMin = parseInt(document.getElementById('input-work').value) || 25;
+  config.breakMin = parseInt(document.getElementById('input-break').value) || 5;
+  config.longMin = parseInt(document.getElementById('input-long').value) || 15;
+  localStorage.setItem('pomo-config-v2', JSON.stringify(config));
+  closeSettings();
+  resetTimer();
+  checkBanner();
+  toast('設定を保存しました');
+}
+
+// ── MODE ──────────────────────────────────────────────
+function applyConfig() {
+  const mins = { work: config.workMin, break: config.breakMin, long: config.longMin };
+  totalSeconds = mins[mode] * 60;
+  remaining = totalSeconds;
+  updateDisplay(); updateProgress();
+}
+function switchMode(m) {
+  if (running) return;
+  mode = m;
+  ['work','break','long'].forEach(t =>
+    document.getElementById('tab-'+t).classList.toggle('active', t === m)
+  );
+  const labels = { work:'作業セッション', break:'短い休憩', long:'長い休憩' };
+  document.getElementById('timer-label').textContent = labels[m];
+  const isBreak = m !== 'work';
+  document.getElementById('timer-display').classList.toggle('break-mode', isBreak);
+  document.getElementById('progress-bar').classList.toggle('break-mode', isBreak);
+  applyConfig();
+}
+
+// ── TIMER ─────────────────────────────────────────────
+function toggleTimer() { running ? pauseTimer() : startTimer(); }
+function startTimer() {
+  running = true;
+  document.getElementById('start-btn').textContent = '一時停止';
+  interval = setInterval(tick, 1000);
+}
+function pauseTimer() {
+  running = false;
+  document.getElementById('start-btn').textContent = '開始';
+  clearInterval(interval);
+}
+function resetTimer() { pauseTimer(); applyConfig(); }
+function tick() {
+  if (remaining <= 0) { onSessionEnd(); return; }
+  remaining--;
+  updateDisplay(); updateProgress();
+}
+function updateDisplay() {
+  const m = Math.floor(remaining/60).toString().padStart(2,'0');
+  const s = (remaining%60).toString().padStart(2,'0');
+  document.getElementById('timer-display').textContent = `${m}:${s}`;
+}
+function updateProgress() {
+  document.getElementById('progress-bar').style.width = (remaining/totalSeconds*100)+'%';
+}
+
+async function onSessionEnd() {
+  pauseTimer();
+  document.getElementById('start-btn').textContent = '開始';
+  if (mode === 'work') {
+    pomoCount++;
+    renderDots();
+    const addedMin = config.workMin;
+    todayAdded += addedMin;
+    updateStatDisplay();
+    const saved = selectedTask && config.workerUrl && config.dbId
+      ? await saveToNotion(selectedTask, addedMin)
+      : false;
+    addLog(selectedTask ? selectedTask.name : '（タスク未選択）', addedMin, saved);
+    if (Notification.permission === 'granted')
+      new Notification('🍅 ポモドーロ完了！', { body: '休憩を取りましょう。' });
+    toast('セッション完了！');
+    setTimeout(() => switchMode(pomoCount % 4 === 0 ? 'long' : 'break'), 800);
+  } else {
+    toast('休憩終了！作業を再開しましょう。');
+    setTimeout(() => switchMode('work'), 800);
+  }
+}
+
+function renderDots() {
+  const wrap = document.getElementById('pomo-dots');
+  wrap.innerHTML = '';
+  const filled = pomoCount % 4 || (pomoCount > 0 && pomoCount % 4 === 0 ? 4 : 0);
+  for (let i = 0; i < 4; i++) {
+    const d = document.createElement('div');
+    d.className = 'pomo-dot' + (i < filled ? ' done' : '');
+    wrap.appendChild(d);
+  }
+}
+
+// ── NOTION (via Worker) ───────────────────────────────
+async function fetchTasks() {
+  if (!config.workerUrl || !config.dbId) {
+    toast('設定からWorker URLとDB IDを入力してください', true);
+    openSettings(); return;
+  }
+  const btn = document.querySelector('.fetch-btn');
+  btn.textContent = '取得中...';
+  try {
+    const res = await fetch(`${config.workerUrl}/databases/${config.dbId}/query`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ page_size: 50 }),
+    });
+    if (!res.ok) throw new Error('API error: ' + res.status);
+    const data = await res.json();
+    tasks = data.results.map(page => {
+      const tp = page.properties[config.nameProp];
+      const np = page.properties[config.timeProp];
+      const name = tp?.title?.[0]?.plain_text || tp?.rich_text?.[0]?.plain_text || '(無題)';
+      return { id: page.id, name, currentTime: np?.number || 0 };
+    });
+    populateSelect();
+    toast(`${tasks.length}件取得しました`);
+  } catch(e) {
+    toast('取得失敗: ' + e.message, true);
+  }
+  btn.textContent = '↻ Notionから取得';
+}
+
+function populateSelect() {
+  const sel = document.getElementById('task-select');
+  sel.innerHTML = '<option value="">— タスクを選択 —</option>';
+  tasks.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.id; opt.textContent = t.name;
+    sel.appendChild(opt);
+  });
+  sel.onchange = () => {
+    selectedTask = tasks.find(t => t.id === sel.value) || null;
+    todayAdded = 0;
+    updateStatDisplay();
+  };
+}
+
+function updateStatDisplay() {
+  const wrap = document.getElementById('task-stats');
+  if (selectedTask) {
+    wrap.style.display = 'flex';
+    document.getElementById('stat-total').textContent = selectedTask.currentTime + todayAdded;
+    document.getElementById('stat-today').textContent = todayAdded;
+  } else {
+    wrap.style.display = 'none';
+  }
+}
+
+async function saveToNotion(task, addedMin) {
+  try {
+    const newTotal = task.currentTime + addedMin;
+    task.currentTime = newTotal;
+    const res = await fetch(`${config.workerUrl}/pages/${task.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ properties: { [config.timeProp]: { number: newTotal } } }),
+    });
+    return res.ok;
+  } catch(e) {
+    toast('Notion保存失敗: ' + e.message, true);
+    return false;
+  }
+}
+
+// ── LOG ───────────────────────────────────────────────
+function addLog(taskName, min, saved) {
+  const list = document.getElementById('log-list');
+  const empty = list.querySelector('.empty-log');
+  if (empty) empty.remove();
+  const time = new Date().toLocaleTimeString('ja-JP', { hour:'2-digit', minute:'2-digit' });
+  const li = document.createElement('li');
+  li.className = 'log-item';
+  li.innerHTML = `
+    <span class="log-task">${taskName}</span>
+    <span class="log-right">
+      <span class="log-meta">${min}分 · ${time}</span>
+      ${saved ? '<span class="log-saved">✓ 保存</span>' : ''}
+    </span>`;
+  list.prepend(li);
+}
+
+// ── TOAST ─────────────────────────────────────────────
+function toast(msg, isError = false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(() => el.className = 'toast', 3000);
+}
+
+if (Notification.permission === 'default') Notification.requestPermission();
+</script>
+</body>
+</html>
